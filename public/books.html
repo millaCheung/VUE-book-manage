@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <link rel="stylesheet" href="./css/books.css">
+</head>
+<body>
+<div id="app">
+    <div class="grid">
+        <div>
+            <h1>图书管理</h1>
+            <div class="books">
+                <div>
+                    <label for="id">编号：</label>
+                    <input type="text" id="id" v-model="id" disabled="false" v-focus>
+                    <label for="name">名称：</label>
+                    <input type="text" id="name" v-model="name">
+                    <button @click="handle" :disabled="submitFlag">提交</button>
+                </div>
+            </div>
+        </div>
+        <div class="total">
+            <span>图书总数：</span>
+            <span>{{total}}</span>
+        </div>
+        <table>
+            <thead>
+            <tr>
+                <th>编号</th>
+                <th>名称</th>
+                <th>事件</th>
+                <th>操作</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr :key="item.id" v-for="item in books">
+                <td>{{item.id}}</td>
+                <td>{{item.name}}</td>
+                <td>{{item.date | format('YYYY-MM-DD')}}</td>
+                <td>
+                    <a href="javascript:;" @click.prevent="toEdit(item.id)">修改</a>
+                    <span>|</span>
+                    <a href="javascript:;" @click.prevent="deleteBook(item.id)">删除</a>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+<script src="./js/axios.min.js"></script>
+<script src="./js/vue.js"></script>
+<script src="./js/moment.js"></script>
+<script>
+    axios.defaults.baseURL = 'http://localhost:4000/';
+    axios.interceptors.response.use(function (res) {
+        return res.data;
+    }, function (err) {
+        console.log(err);
+    });
+    var vm = new Vue({
+        el: '#app',
+        data: {
+            id: '',
+            name: '',
+            flag: false,
+            submitFlag: false,
+            books: ''
+        },
+        methods: {
+            handle: async function () {
+                if (this.flag) {
+                    // 编辑图书
+                    var ret = await axios.put('books/' + this.id, {
+                        name: this.name
+                    });
+                    if (ret.status === 200) {
+                        // 重新加载列表数据
+                        this.queryData();
+                    }
+                    this.flag = false;
+                } else {
+                    // 添加图书
+                    var ret = await axios.post('books', {
+                        name: this.name
+                    });
+                    if (ret.status === 200) {
+                        // 重新加载列表数据
+                        this.queryData();
+                    }
+                }
+                this.id = this.name = '';
+            },
+            toEdit: async function (id) {
+                // flag 状态用于区分编辑和添加操作
+                this.flag = true;
+                // 根据 id 查询出对应的图书信息
+                var ret = await axios.get('books/' + id);
+                this.id = ret.id;
+                this.name = ret.name;
+            },
+            deleteBook: async function (id) {
+                // 删除图书
+                var ret = await axios.delete('books/' + id);
+                if (ret.status === 200) {
+                    this.queryData();
+                }
+            },
+            queryData: async function () {
+                // 调用后台接口获取图书列表数据
+                this.books = await axios.get('/books');
+            }
+        },
+        filters: {
+            format: function (value, arg) {
+                // moment.locale();
+                return moment().format(arg);
+            }
+        },
+        directives: {
+            focus: {
+                inserted: function (el) {
+                    el.focus();
+                }
+            }
+        },
+        computed: {
+            total: function () {
+                // 计算图书总数
+                return this.books.length;
+            }
+        },
+        watch: {
+            name: async function (val) {
+                if (val) {
+                    // 验证图书名称是否存在
+                    var ret = await axios.get('/books/book/' + this.name);
+                    this.submitFlag = ret.status === 1;
+                } else {
+                    this.id = '';
+                    this.submitFlag = this.flag = false;
+                }
+            }
+        },
+        mounted: function () {
+            this.queryData();
+        }
+    })
+</script>
+</body>
+</html>
